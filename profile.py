@@ -1,74 +1,53 @@
-import mysql.connector
-import younger_profile
-
-
-mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  passwd="password",
-  use_pure=True,
-  database="caregiving"
-)
-
-mycursor = mydb.cursor()
+from db import *
+from younger_profile import YoungerProfile
+from elder_profile import ElderProfile
 
 # user registration class
-class User_SignUp:
+class User:
     #constructors
-    def __init__(self, name, password, mobile, role):
+    def __init__(self, name, email, password, mobile, role):
         self.name = name
+        self.email = email
         self.password = password
         self.mobile = mobile
         self.role = role
+        
 
     def user_registration(self):
-        #retrieving all registered mobile no from both table
-        sql = f'SELECT * FROM elders WHERE mobile= {self.mobile}'
-        mycursor.execute(sql)
-        elders_mobile_no = mycursor.fetchall()
-        sql = f'SELECT * FROM youngers WHERE mobile= {self.mobile}'
-        mycursor.execute(sql)
-        youngers_mobile_no = mycursor.fetchall()
+        #retrieving all registered email no from user table
+        user_id = self.get_user_id()
         
-        if youngers_mobile_no==[] and elders_mobile_no==[]:    
-            if self.role=='elder':
-                sql = "INSERT INTO elders (name, password, mobile) VALUES (%s, %s, %s)"
-                val = (self.name, self.password, self.mobile)
-                mycursor.execute(sql, val)
-                mydb.commit()
-                print(f'Account Created for {self.name}')
-                import elder_profile
-                elder = elder_profile.Elder_Profile(self.mobile, self.password)
-                elder.dashboardElder()
-            elif self.role=='younger':
-                sql = "INSERT INTO youngers (name, password, mobile) VALUES (%s, %s, %s)"
-                val = (self.name, self.password, self.mobile)
-                mycursor.execute(sql, val)
-                mydb.commit()
-                print(f'Account Created for {self.name}')
-                young = younger_profile.Younger_Profile(self.mobile, self.password)
-                young.dashboardYounger()
+        if user_id is None:
+            sql = "INSERT INTO users (name, email, password, mobile) VALUES (%s, %s, %s, %s)"
+            val = (self.name, self.email, self.password, self.mobile)
+            mycursor.execute(sql, val)
+            mydb.commit()  
 
-
-        # if no already registered ask them to login again or reset password
-        else:  # fetchall stores tuple in a list
-            print(f'Account already created for {self.mobile} Please try to Login using your mobile number and password.\n Want to reset password?\n1. Yes\n2. No')
+        # if email already registered ask them to login again or reset password
+        else:
+            print(f'Account already created for {self.email} Please try to Login using your mobile number and password.\n Want to reset password?\n1. Yes\n2. No')
             reset_pass = int(input())
             # Reset password Function
             if reset_pass==1:
                 new_pass = input("Enter your New pass: ")
-                if self.role=='elder':
-                    sql = "UPDATE elders set password = %s WHERE mobile = %s"
-                    val = ( new_pass, self.mobile)
-                    mycursor.execute(sql, val)
-                    mydb.commit()
-                    print("Password Reset Successfully.")
-                elif self.role=='younger':
-                    sql = "UPDATE youngers set password = %s WHERE mobile = %s"
-                    val = ( new_pass, self.mobile)
-                    mycursor.execute(sql, val)
-                    mydb.commit()
-                    print("Password Reset Successfully.")
+                sql = "UPDATE users set password = %s WHERE email = %s"
+                val = ( new_pass, self.email)
+                mycursor.execute(sql, val)
+                mydb.commit()
+                print("Password Reset Successfully.")  
             else:
                 import index    # due to mutual importing we are importing here just before methodcalling
-                index.Welcome() 
+
+        if self.role=="younger":
+            younger = YoungerProfile(self.email, self.password)
+            younger.sign_up(self.get_user_id())
+        elif self.role=="younger":
+            elder = ElderProfile(self.email, self.password)
+            elder.sign_up(self.get_user_id())
+
+    def get_user_id(self):
+        sql = f'SELECT PK_user_id FROM users WHERE email = "{self.email}" '
+        mycursor.execute(sql)
+        user_id = mycursor.fetchone()
+        return user_id
+

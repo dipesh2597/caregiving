@@ -1,59 +1,30 @@
-import mysql.connector
-
-# conneting mysql
-mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd="password",
-    use_pure=True,
-)
-cursor = mydb.cursor()
-
-# creating database if not exists
-cursor.execute("CREATE DATABASE IF NOT EXISTS caregiving")
-
-# getting database
-mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  passwd="password",
-  use_pure=True,
-  database="caregiving"
-)
-mycursor = mydb.cursor()
-
-# creating tables for elder and younger if not exists
-mycursor.execute("CREATE TABLE IF NOT EXISTS youngers (PK_younger_id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), password VARCHAR(255), mobile VARCHAR(10) UNIQUE, review VARCHAR(255), rating float)")
-mycursor.execute("CREATE TABLE IF NOT EXISTS elders (PK_elder_id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), password VARCHAR(255), mobile VARCHAR(10) UNIQUE, FK_younger_ID Integer references youngers(PK_younger_id), available BOOLEAN Default True, fund Integer, review VARCHAR(255), rating float)")
-
-# Request table for younger to elder
-mycursor.execute("CREATE TABLE IF NOT EXISTS request (PK_request_id INT AUTO_INCREMENT PRIMARY KEY, FK_younger_id integer references youngers(PK_younger_id), FK_elder_id integer references elders(PK_elder_id), request_status BOOLEAN Default False)")
-
-# import after creating database if does not exist because we required database in imported files if do will not create it before import then it will throw an error
-from profile import User_SignUp
-from younger_profile import Younger_Profile
-from elder_profile import Elder_Profile
+from db import *
+from profile import User
+from younger_profile import YoungerProfile
+from elder_profile import ElderProfile
 
 # welcome note and giving oprion to login or register
-def Welcome():
+def welcome():
     print("Please select\n1. Login as Elder \n2. Login as Younger\n3. Register\n4. View all youngers who are taking care\n5. View who is taking care of older couple\n6. Exit")
     task = int(input())
     if task==1:
-        mobile = input("Welcome Elder\nEnter Your Mobile Number: ")
+        mobile = input("Welcome Elder\nEnter Your Email: ")
         password = input("Enter Your Password: ")
-        user = Elder_Profile(mobile, password)
-        user.login(mobile,password)
+        user = ElderProfile(mobile, password)
+        user.log_in()
     
     elif task==2:
-        mobile = input("Welcome younger\nEnter Your Mobile Number: ")
+        mobile = input("Welcome younger\nEnter Your Email: ")
         password = input("Enter Your Password: ")
-        user = Younger_Profile(mobile, password)
-        user.login(mobile,password)
+        user = YoungerProfile(mobile, password)
+        user.log_in()
     
     elif task==3:
         name = input("Register Yourself\nEnter Your Full Name: ")
+        email = input("Enter your email: ")
         mobile = input("Enter Your Mobile Number: ")
         password = input("Enter Your Password: ")
+        
         # if a user select wrong option it will ask again to select option
         while True:
             role = int(input("select your role:\n1. Elder\n2. Younger\n"))
@@ -66,29 +37,40 @@ def Welcome():
                     break
             except:
                 print(f'option not Valid! Please try again')
-        user_signup = User_SignUp(name, password, mobile, role)
+
+        user_signup = User(name, email, password, mobile, role)
         user_signup.user_registration()
+        
     
     elif task==4:
-        sql = f'SELECT * from youngers where PK_younger_id in (select FK_younger_ID from elders)'
+        sql = f'SELECT name from users where PK_user_id in (select FK_younger_ID from elders)'
         mycursor.execute(sql)
         younger_info = mycursor.fetchall()
+        print(younger_info)
         print("This all youngeFolks are taking care of some older")
         for i in range(len(younger_info)):
-            print(f'{i+1}. {younger_info[i][1]}')
+            print(f'{i+1}. {younger_info[i][0]}')
+        welcome()
 
     elif task==5:
-        elderNumber = int(input("Please enter elder's mobile number.\n"))
-        sql = f'SELECT name, FK_younger_id from elders WHERE mobile={elderNumber}'
-        val=(elderNumber)
-        mycursor.execute(sql, val)
+        elder_number = int(input("Please enter elder's mobile number.\n"))
+        sql = f'SELECT PK_user_id from users where mobile={elder_number}'
+        mycursor.execute(sql)
+        user_id = mycursor.fetchone()
+        sql = f'SELECT FK_younger_id, available from elders WHERE FK_user_id={user_id[0]}'
+        mycursor.execute(sql)
         elder_detail= mycursor.fetchone()
-        sql=f'select name from youngers where PK_younger_id={elder_detail[1]}'
-        val=(elder_detail[0])
-        mycursor.execute(sql, val)
-        younger_name = mycursor.fetchone()
-        print(f'{younger_name[0]} is taking care of {elder_detail[0]}.')
+        print(elder_detail)
+        if elder_detail[1]==0:
+            sql=f'select name from users where PK_user_id={elder_detail[0]}'
+            val=(elder_detail[0])
+            mycursor.execute(sql, val)
+            younger_name = mycursor.fetchone()
+            print(f'{younger_name[0]} is taking care of {elder_detail[0]}.')
+        else:
+            print(f'No one is taking care of {elder_detail[0]}')
+        welcome()
     elif task==6:
         exit()
 
-Welcome()
+welcome()
